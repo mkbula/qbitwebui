@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import type { Torrent, TorrentState } from '../types/qbittorrent'
 import { formatSpeed, formatSize, formatEta, formatDate, formatRelativeTime, formatDuration } from '../utils/format'
@@ -41,6 +41,12 @@ function getColor(type: StateType): string {
 		info: '#8b5cf6',
 	}
 	return colors[type]
+}
+
+const BADGE_STYLE: CSSProperties = {
+	color: 'var(--text-secondary)',
+	backgroundColor: 'color-mix(in srgb, var(--text-secondary) 6%, transparent)',
+	border: '1px solid var(--border)',
 }
 
 const TWO_PART_TLD_MARKERS = new Set(['co', 'com', 'net', 'org', 'gov', 'edu'])
@@ -194,26 +200,27 @@ function renderCell(columnId: string, torrent: Torrent, ctx: CellContext): React
 			)
 		case 'category':
 			return torrent.category ? (
-				<span className="px-1.5 py-0.5 rounded text-[10px] bg-white/5 text-white/70 border border-white/10 whitespace-nowrap">
+				<span className="px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap" style={BADGE_STYLE}>
 					{torrent.category}
 				</span>
 			) : (
-				<span className="text-xs text-gray-500">—</span>
+				<span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+					—
+				</span>
 			)
 		case 'tags':
 			return torrent.tags ? (
 				<div className="flex gap-1">
 					{torrent.tags.split(',').map((tag, i) => (
-						<span
-							key={i}
-							className="px-1.5 py-0.5 rounded text-[10px] bg-white/5 text-white/70 border border-white/10 whitespace-nowrap"
-						>
+						<span key={i} className="px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap" style={BADGE_STYLE}>
 							{tag.trim()}
 						</span>
 					))}
 				</div>
 			) : (
-				<span className="text-xs text-gray-500">—</span>
+				<span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+					—
+				</span>
 			)
 		case 'num_seeds':
 			return (

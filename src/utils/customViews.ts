@@ -47,7 +47,7 @@ export function createView(
 	}
 ): CustomView {
 	return {
-		id: crypto.randomUUID(),
+		id: Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''),
 		name: name.trim(),
 		sortKey: config.sortKey,
 		sortAsc: config.sortAsc,

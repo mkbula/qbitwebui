@@ -78,7 +78,7 @@ export default function App() {
 			}
 		}
 		const autoSelect = localStorage.getItem('autoSelectSingleInstance') === 'true'
-		if (autoSelect) {
+		if (autoSelect && tab === 'dashboard') {
 			const instances = await getInstances().catch(() => [])
 			if (instances.length === 1) {
 				setCurrentInstance(instances[0])
