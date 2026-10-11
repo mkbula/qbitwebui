@@ -195,4 +195,3 @@ export function isTorrentAddSuccessful(addText: string): boolean {
 	}
 	return false
 }
-

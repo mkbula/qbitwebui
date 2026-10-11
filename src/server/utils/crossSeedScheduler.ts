@@ -255,7 +255,7 @@ export async function triggerManualScan(
 			if (config) {
 				scheduleNextRun(instanceId, userId, config.interval_hours)
 			}
-			throw new Error('Scan stopped')
+			throw new Error('Scan stopped', { cause: e })
 		}
 		throw e
 	} finally {

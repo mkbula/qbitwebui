@@ -21,7 +21,8 @@ export async function fetchWithTls(url: string, options: RequestInit = {}): Prom
 				err.message.includes('CERT_'))
 		) {
 			throw new Error(
-				'TLS certificate validation failed. If using self-signed certificates, set ALLOW_SELF_SIGNED_CERTS=true'
+				'TLS certificate validation failed. If using self-signed certificates, set ALLOW_SELF_SIGNED_CERTS=true',
+				{ cause: err }
 			)
 		}
 		throw err

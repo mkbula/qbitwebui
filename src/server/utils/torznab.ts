@@ -190,7 +190,7 @@ export async function searchTorznab(
 	} catch (e) {
 		const retryAfter = Date.now() + ERROR_SNOOZE_MS
 		updateIndexerStatus(integrationId, indexer.id, indexer.name, IndexerStatus.UNKNOWN_ERROR, retryAfter)
-		throw new Error(`${indexer.name} failed to respond: ${e instanceof Error ? e.message : 'Unknown'}`)
+		throw new Error(`${indexer.name} failed to respond: ${e instanceof Error ? e.message : 'Unknown'}`, { cause: e })
 	}
 
 	if (!res.ok) {

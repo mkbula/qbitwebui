@@ -124,8 +124,8 @@ files.get('/download', async (c) => {
 			let streamError: Error | null = null
 			let resolveWait: (() => void) | null = null
 
-			pack.on('data', (chunk: Buffer) => {
-				chunks.push(chunk)
+			pack.on('data', (chunk) => {
+				chunks.push(chunk as Buffer)
 				if (resolveWait) {
 					resolveWait()
 					resolveWait = null

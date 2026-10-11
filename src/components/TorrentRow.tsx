@@ -47,7 +47,7 @@ const TWO_PART_TLD_MARKERS = new Set(['co', 'com', 'net', 'org', 'gov', 'edu'])
 
 function getTrackerName(tracker: string): string {
 	if (!tracker) return '—'
-	let host = ''
+	let host: string
 	try {
 		host = new URL(tracker).hostname
 	} catch {
