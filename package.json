@@ -14,7 +14,7 @@
     "dev:client": "vite",
     "build": "tsc -b && vite build",
     "start": "bun run src/server/index.ts",
-    "check": "tsc --noEmit",
+    "check": "tsc -b --noEmit",
     "lint": "eslint .",
     "format": "prettier --write src/",
     "preview": "vite preview",

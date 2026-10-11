@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { PathInput } from './ui/PathInput'
+import { SpeedLimitFields } from './ui/SpeedLimitFields'
 import { usePathHistory } from '../hooks/usePathHistory'
 import {
 	useCategories,
@@ -17,8 +18,10 @@ import {
 	useSetTorrentDownloadPath,
 	useSetTorrentLocation,
 	useExportTorrents,
+	useSetTorrentSpeedLimits,
 } from '../hooks/useTorrents'
 import type { Torrent } from '../types/qbittorrent'
+import { commonKiB, getLimitChanges, type SpeedLimitValues } from '../utils/speedLimits'
 
 interface Props {
 	x: number
@@ -28,12 +31,13 @@ interface Props {
 }
 
 type Submenu = 'category' | 'addTag' | 'removeTag' | 'delete' | null
-type EditorMode = 'rename' | 'savePath' | 'downloadPath' | null
+type EditorMode = 'rename' | 'savePath' | 'downloadPath' | 'speedLimits' | null
 
 export function ContextMenu({ x, y, torrents, onClose }: Props) {
 	const [submenu, setSubmenu] = useState<Submenu>(null)
 	const [editorMode, setEditorMode] = useState<EditorMode>(null)
 	const [inputValue, setInputValue] = useState('')
+	const [limits, setLimits] = useState<SpeedLimitValues>({ dl: '', up: '' })
 	const ref = useRef<HTMLDivElement>(null)
 	const inputRef = useRef<HTMLInputElement>(null)
 	const { addPath } = usePathHistory()
@@ -52,6 +56,7 @@ export function ContextMenu({ x, y, torrents, onClose }: Props) {
 	const setDownloadPathMutation = useSetTorrentDownloadPath()
 	const deleteMutation = useDeleteTorrents()
 	const exportMutation = useExportTorrents()
+	const speedLimitsMutation = useSetTorrentSpeedLimits()
 
 	const hashes = torrents.map((t) => t.hash)
 	const isSingle = torrents.length === 1
@@ -61,6 +66,9 @@ export function ContextMenu({ x, y, torrents, onClose }: Props) {
 				.map((t) => t.trim())
 				.filter(Boolean)
 		: []
+	const commonDl = commonKiB(torrents.map((t) => t.dl_limit))
+	const commonUp = commonKiB(torrents.map((t) => t.up_limit))
+	const initialLimits = { dl: commonDl ?? '', up: commonUp ?? '' }
 
 	useEffect(() => {
 		function handleClickOutside(e: MouseEvent) {
@@ -86,7 +94,7 @@ export function ContextMenu({ x, y, torrents, onClose }: Props) {
 
 	const menuStyle: React.CSSProperties = {
 		position: 'fixed',
-		left: Math.min(x, window.innerWidth - 200),
+		left: Math.min(x, window.innerWidth - (editorMode === 'speedLimits' ? 260 : 200)),
 		top: Math.min(y, window.innerHeight - 300),
 		backgroundColor: 'var(--bg-tertiary)',
 		borderColor: 'var(--border)',
@@ -128,6 +136,13 @@ export function ContextMenu({ x, y, torrents, onClose }: Props) {
 	}
 
 	function handleEditorSubmit() {
+		if (editorMode === 'speedLimits') {
+			const changes = getLimitChanges(initialLimits, limits)
+			if (Object.keys(changes).length > 0) speedLimitsMutation.mutate({ hashes, limits: changes })
+			onClose()
+			return
+		}
+
 		const value = inputValue.trim()
 		if (!value) return
 
@@ -169,6 +184,12 @@ export function ContextMenu({ x, y, torrents, onClose }: Props) {
 		setSubmenu(null)
 	}
 
+	function startSetSpeedLimits() {
+		setLimits(initialLimits)
+		setEditorMode('speedLimits')
+		setSubmenu(null)
+	}
+
 	const showDownloadPath = torrents.some((t) => t.download_path && t.progress < 1)
 
 	function handleDelete(deleteFiles: boolean) {
@@ -182,7 +203,13 @@ export function ContextMenu({ x, y, torrents, onClose }: Props) {
 	}
 
 	const editorTitle =
-		editorMode === 'rename' ? 'Rename torrent' : editorMode === 'savePath' ? 'Change save path' : 'Change download path'
+		editorMode === 'rename'
+			? 'Rename torrent'
+			: editorMode === 'savePath'
+				? 'Change save path'
+				: editorMode === 'speedLimits'
+					? 'Speed limits'
+					: 'Change download path'
 	const editorActionLabel = editorMode === 'rename' ? 'Rename' : 'Save'
 	const editorPlaceholder =
 		editorMode === 'rename'
@@ -197,7 +224,27 @@ export function ContextMenu({ x, y, torrents, onClose }: Props) {
 				<div className="text-xs font-medium mb-2" style={{ color: 'var(--text-muted)' }}>
 					{editorTitle}
 				</div>
-				{editorMode === 'rename' ? (
+				{editorMode === 'speedLimits' ? (
+					<div className="mb-2 w-56">
+						<SpeedLimitFields
+							value={limits}
+							onChange={setLimits}
+							onSubmit={handleEditorSubmit}
+							onCancel={onClose}
+							placeholders={{
+								dl: commonDl === null ? 'Mixed' : undefined,
+								up: commonUp === null ? 'Mixed' : undefined,
+							}}
+							inputClassName="w-full px-2 py-1.5 rounded-lg border text-sm"
+							inputStyle={{
+								backgroundColor: 'var(--bg-secondary)',
+								borderColor: 'var(--border)',
+								color: 'var(--text-primary)',
+							}}
+							autoFocus
+						/>
+					</div>
+				) : editorMode === 'rename' ? (
 					<input
 						ref={inputRef}
 						type="text"
@@ -246,7 +293,7 @@ export function ContextMenu({ x, y, torrents, onClose }: Props) {
 					<button
 						onClick={handleEditorSubmit}
 						className="flex-1 py-1.5 rounded-lg text-xs"
-						disabled={!inputValue.trim()}
+						disabled={editorMode !== 'speedLimits' && !inputValue.trim()}
 						style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-contrast)' }}
 					>
 						{editorActionLabel}
@@ -320,6 +367,7 @@ export function ContextMenu({ x, y, torrents, onClose }: Props) {
 			)}
 			<MenuItem onClick={startSetSavePath}>Change Save Path</MenuItem>
 			{showDownloadPath && <MenuItem onClick={startSetDownloadPath}>Change Download Path</MenuItem>}
+			<MenuItem onClick={startSetSpeedLimits}>Speed Limits</MenuItem>
 			<div className="h-px my-1" style={{ backgroundColor: 'var(--border)' }} />
 			<MenuItem onClick={handleExport}>Export</MenuItem>
 			<MenuItem onClick={() => setSubmenu(submenu === 'delete' ? null : 'delete')} hasSubmenu>

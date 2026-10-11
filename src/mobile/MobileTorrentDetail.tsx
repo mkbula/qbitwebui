@@ -5,8 +5,10 @@ import { Drawer } from 'vaul'
 import { Play, Pause, Trash2 } from 'lucide-react'
 import * as api from '../api/qbittorrent'
 import type { TorrentState } from '../types/qbittorrent'
-import { formatSize, formatSpeed, formatDate, formatDuration } from '../utils/format'
+import { formatSize, formatSpeed, formatDate, formatDuration, formatLimit } from '../utils/format'
 import { PathInput } from '../components/ui/PathInput'
+import { SpeedLimitFields } from '../components/ui/SpeedLimitFields'
+import { getLimitChanges, limitToKiB, type SpeedLimitChanges, type SpeedLimitValues } from '../utils/speedLimits'
 import { usePathHistory } from '../hooks/usePathHistory'
 
 type Tab = 'general' | 'files' | 'trackers' | 'peers' | 'http'
@@ -49,6 +51,7 @@ export function MobileTorrentDetail({ torrentHash, instanceId, onClose }: Props)
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 	const [pathEditorMode, setPathEditorMode] = useState<PathEditorMode>(null)
 	const [pathValue, setPathValue] = useState('')
+	const [limits, setLimits] = useState<SpeedLimitValues | null>(null)
 	const [deleteFiles, setDeleteFiles] = useState(false)
 	const queryClient = useQueryClient()
 	const { addPath } = usePathHistory()
@@ -119,6 +122,14 @@ export function MobileTorrentDetail({ torrentHash, instanceId, onClose }: Props)
 		},
 	})
 
+	const speedLimitsMutation = useMutation({
+		mutationFn: (changes: SpeedLimitChanges) => api.setTorrentSpeedLimits(instanceId, [torrentHash], changes),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['torrents', instanceId] })
+			queryClient.invalidateQueries({ queryKey: ['torrent-properties', instanceId, torrentHash] })
+		},
+	})
+
 	const isPaused = torrent ? PAUSED_STATES.includes(torrent.state) : false
 	const peers = peersData?.peers ? Object.values(peersData.peers) : []
 
@@ -164,6 +175,21 @@ export function MobileTorrentDetail({ torrentHash, instanceId, onClose }: Props)
 		}
 	}
 
+	const initialLimits = {
+		dl: limitToKiB(torrent?.dl_limit ?? 0),
+		up: limitToKiB(torrent?.up_limit ?? 0),
+	}
+
+	function handleLimitsSave() {
+		if (!limits) return
+		const changes = getLimitChanges(initialLimits, limits)
+		if (Object.keys(changes).length === 0) {
+			setLimits(null)
+			return
+		}
+		speedLimitsMutation.mutate(changes, { onSuccess: () => setLimits(null) })
+	}
+
 	const pathMutationPending = setLocationMutation.isPending || setDownloadPathMutation.isPending
 	const pathEditorTitle = pathEditorMode === 'savePath' ? 'Change Save Path' : 'Change Download Path'
 
@@ -186,8 +212,8 @@ export function MobileTorrentDetail({ torrentHash, instanceId, onClose }: Props)
 	return (
 		<>
 			<Drawer.Root
-				open={!showDeleteConfirm && !pathEditorMode}
-				onOpenChange={(open) => !open && !showDeleteConfirm && !pathEditorMode && onClose()}
+				open={!showDeleteConfirm && !pathEditorMode && !limits}
+				onOpenChange={(open) => !open && !showDeleteConfirm && !pathEditorMode && !limits && onClose()}
 				shouldScaleBackground={false}
 			>
 				<Drawer.Portal>
@@ -303,6 +329,12 @@ export function MobileTorrentDetail({ torrentHash, instanceId, onClose }: Props)
 									<InfoRow label="Upload Speed" value={formatSpeed(torrent.upspeed)} accent="#a6e3a1" />
 									<InfoRow label="Seeds" value={`${torrent.num_seeds}`} />
 									<InfoRow label="Peers" value={`${torrent.num_leechs}`} />
+									<EditableRow
+										label="Speed Limits"
+										value={`↓ ${formatLimit(torrent.dl_limit)}  ↑ ${formatLimit(torrent.up_limit)}`}
+										onEdit={() => setLimits(initialLimits)}
+										editDisabled={speedLimitsMutation.isPending}
+									/>
 									<div className="h-px my-2" style={{ backgroundColor: 'var(--border)' }} />
 									<InfoRow label="Added" value={formatDate(torrent.added_on)} />
 									<InfoRow label="Completed" value={formatDate(torrent.completion_on)} />
@@ -311,14 +343,14 @@ export function MobileTorrentDetail({ torrentHash, instanceId, onClose }: Props)
 									<div className="h-px my-2" style={{ backgroundColor: 'var(--border)' }} />
 									<InfoRow label="Category" value={torrent.category || '-'} />
 									<InfoRow label="Tags" value={torrent.tags || '-'} />
-									<PathRow
+									<EditableRow
 										label="Save Path"
 										value={torrent.save_path}
 										onEdit={() => openPathEditor('savePath')}
 										editDisabled={pathMutationPending}
 									/>
 									{torrent.download_path && (torrent.download_path !== torrent.save_path || torrent.progress < 1) && (
-										<PathRow
+										<EditableRow
 											label="Download Path"
 											value={torrent.download_path}
 											onEdit={torrent.progress < 1 ? () => openPathEditor('downloadPath') : undefined}
@@ -515,6 +547,58 @@ export function MobileTorrentDetail({ torrentHash, instanceId, onClose }: Props)
 					document.body
 				)}
 
+			{limits &&
+				createPortal(
+					<div
+						className="fixed inset-0 z-[9999] flex items-center justify-center"
+						style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+						onClick={() => !speedLimitsMutation.isPending && setLimits(null)}
+					>
+						<div
+							className="mx-4 w-full max-w-lg rounded-2xl border p-5"
+							style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)' }}
+							onClick={(e) => e.stopPropagation()}
+						>
+							<h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+								Speed Limits
+							</h3>
+							<SpeedLimitFields
+								value={limits}
+								onChange={setLimits}
+								onSubmit={handleLimitsSave}
+								inputClassName="w-full px-4 py-3 rounded-xl border text-base"
+								inputStyle={{
+									backgroundColor: 'var(--bg-tertiary)',
+									borderColor: 'var(--border)',
+									color: 'var(--text-primary)',
+									fontSize: '16px',
+								}}
+								labelClassName="text-xs"
+								touchFocus
+							/>
+							<div className="flex gap-3 mt-5">
+								<button
+									onClick={() => setLimits(null)}
+									disabled={speedLimitsMutation.isPending}
+									className="flex-1 py-3 rounded-xl text-sm font-medium disabled:opacity-50"
+									style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+								>
+									Cancel
+								</button>
+								<button
+									onClick={handleLimitsSave}
+									disabled={speedLimitsMutation.isPending}
+									className="flex-1 py-3 rounded-xl text-sm font-medium disabled:opacity-50"
+									style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-contrast)' }}
+								>
+									{speedLimitsMutation.isPending ? 'Saving...' : 'Save'}
+								</button>
+							</div>
+						</div>
+					</div>,
+					document.body
+				)}
+
 			{showDeleteConfirm &&
 				createPortal(
 					<div
@@ -594,7 +678,7 @@ function InfoRow({
 	)
 }
 
-function PathRow({
+function EditableRow({
 	label,
 	value,
 	onEdit,

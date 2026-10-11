@@ -1,7 +1,15 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import type { Torrent, TorrentState } from '../types/qbittorrent'
-import { formatSpeed, formatSize, formatEta, formatDate, formatRelativeTime, formatDuration } from '../utils/format'
+import {
+	formatSpeed,
+	formatSize,
+	formatEta,
+	formatDate,
+	formatRelativeTime,
+	formatDuration,
+	formatLimit,
+} from '../utils/format'
 
 type StateType = 'accent' | 'warning' | 'muted' | 'info' | 'error'
 
@@ -170,6 +178,13 @@ function renderCell(columnId: string, torrent: Torrent, ctx: CellContext): React
 			return (
 				<span className="text-xs font-mono font-medium whitespace-nowrap" style={{ color: 'var(--warning)' }}>
 					{formatSpeed(torrent.upspeed, false)}
+				</span>
+			)
+		case 'dl_limit':
+		case 'up_limit':
+			return (
+				<span className="text-xs font-mono whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+					{formatLimit(torrent[columnId])}
 				</span>
 			)
 		case 'ratio':

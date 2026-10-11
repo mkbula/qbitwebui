@@ -5,6 +5,10 @@ export function formatSpeed(bytes: number, showZero = true): string {
 	return `${(bytes / 1024 / 1024).toFixed(2)} MiB/s`
 }
 
+export function formatLimit(limit: number): string {
+	return limit > 0 ? formatSpeed(limit) : '∞'
+}
+
 export function formatSize(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`

@@ -3,6 +3,7 @@ import type { Torrent, TorrentFilter, TransferInfo, SyncMaindata } from '../type
 import type { TorrentProperties, Tracker, PeersResponse, TorrentFile, WebSeed } from '../types/torrentDetails'
 import type { QBittorrentPreferences } from '../types/preferences'
 import type { RSSItems, RSSRules, RSSRule, MatchingArticles } from '../types/rss'
+import type { SpeedLimitChanges } from '../utils/speedLimits'
 
 function getBase(instanceId: number): string {
 	return `/api/instances/${instanceId}/qbt/v2`
@@ -299,6 +300,23 @@ export async function addTrackers(instanceId: number, hash: string, urls: string
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 		body: new URLSearchParams({ hash, urls: urls.join('\n') }),
 	})
+}
+
+export async function setTorrentSpeedLimits(
+	instanceId: number,
+	hashes: string[],
+	limits: SpeedLimitChanges
+): Promise<void> {
+	const send = (endpoint: string, limit: number) =>
+		action(instanceId, endpoint, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: new URLSearchParams({ hashes: hashes.join('|'), limit: String(limit) }),
+		})
+	await Promise.all([
+		limits.dl !== undefined && send('/torrents/setDownloadLimit', limits.dl),
+		limits.up !== undefined && send('/torrents/setUploadLimit', limits.up),
+	])
 }
 
 export async function removeTrackers(instanceId: number, hash: string, urls: string[]): Promise<void> {

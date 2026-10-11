@@ -23,10 +23,12 @@ import {
 	useAddTrackers,
 	useRemoveTrackers,
 } from '../hooks/useTorrentDetails'
-import { useSetTorrentDownloadPath, useSetTorrentLocation } from '../hooks/useTorrents'
+import { useSetTorrentDownloadPath, useSetTorrentLocation, useSetTorrentSpeedLimits } from '../hooks/useTorrents'
 import { usePathHistory } from '../hooks/usePathHistory'
 import { PathInput } from './ui/PathInput'
-import { formatSize, formatSpeed, formatDate, formatDuration, formatEta } from '../utils/format'
+import { SpeedLimitFields } from './ui/SpeedLimitFields'
+import { getLimitChanges, limitToKiB, type SpeedLimitValues } from '../utils/speedLimits'
+import { formatSize, formatSpeed, formatDate, formatDuration, formatEta, formatLimit } from '../utils/format'
 import type { Tracker, Peer } from '../types/torrentDetails'
 import { buildFileTree, flattenVisibleNodes, getInitialExpanded } from '../utils/fileTree'
 
@@ -103,10 +105,6 @@ function EmptyState({ message }: { message: string }) {
 	)
 }
 
-function formatLimit(limit: number): string {
-	return limit <= 0 ? '∞' : formatSpeed(limit)
-}
-
 const cellBase = { backgroundColor: 'color-mix(in srgb, white 2.5%, transparent)', borderColor: 'var(--border)' }
 
 function InfoCell({
@@ -116,6 +114,7 @@ function InfoCell({
 	muted,
 	span,
 	wide,
+	onEdit,
 }: {
 	label: string
 	value: string
@@ -123,6 +122,7 @@ function InfoCell({
 	muted?: boolean
 	span?: number
 	wide?: boolean
+	onEdit?: () => void
 }) {
 	const color = muted ? 'var(--text-muted)' : accent ? 'var(--accent)' : 'var(--text-primary)'
 	return (
@@ -130,8 +130,19 @@ function InfoCell({
 			className={`px-3 py-2 rounded border ${wide ? '' : 'min-w-0 overflow-hidden'}`}
 			style={{ ...cellBase, gridColumn: span ? `span ${span}` : undefined }}
 		>
-			<div className="text-[9px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
-				{label}
+			<div className="flex items-center justify-between gap-2">
+				<div className="text-[9px] uppercase tracking-widest truncate" style={{ color: 'var(--text-muted)' }}>
+					{label}
+				</div>
+				{onEdit && (
+					<button
+						onClick={onEdit}
+						className="shrink-0 text-[9px] uppercase tracking-widest font-medium hover:opacity-80"
+						style={{ color: 'var(--accent)' }}
+					>
+						Edit
+					</button>
+				)}
 			</div>
 			<div
 				className={`text-xs font-mono mt-0.5 ${wide ? 'break-all' : 'truncate'}`}
@@ -147,9 +158,11 @@ function InfoCell({
 function GeneralTab({ hash, category, tags }: { hash: string; category: string; tags: string }) {
 	const [editorMode, setEditorMode] = useState<'savePath' | 'downloadPath' | null>(null)
 	const [inputValue, setInputValue] = useState('')
+	const [limits, setLimits] = useState<SpeedLimitValues | null>(null)
 	const { data: p, isLoading } = useTorrentProperties(hash)
 	const setLocationMutation = useSetTorrentLocation()
 	const setDownloadPathMutation = useSetTorrentDownloadPath()
+	const speedLimitsMutation = useSetTorrentSpeedLimits()
 	const { addPath } = usePathHistory()
 	if (isLoading) return <LoadingSkeleton />
 	if (!p) return <EmptyState message="Failed to load" />
@@ -169,6 +182,15 @@ function GeneralTab({ hash, category, tags }: { hash: string; category: string; 
 	function openEditor(mode: 'savePath' | 'downloadPath') {
 		setInputValue(mode === 'downloadPath' ? properties.download_path : properties.save_path)
 		setEditorMode(mode)
+	}
+
+	const initialLimits = { dl: limitToKiB(properties.dl_limit), up: limitToKiB(properties.up_limit) }
+
+	function handleLimitsSave() {
+		if (!limits) return
+		const changes = getLimitChanges(initialLimits, limits)
+		if (Object.keys(changes).length > 0) speedLimitsMutation.mutate({ hashes: [hash], limits: changes })
+		setLimits(null)
 	}
 
 	function handlePathSave() {
@@ -227,8 +249,18 @@ function GeneralTab({ hash, category, tags }: { hash: string; category: string; 
 						value={`${formatSpeed(properties.up_speed)} (${formatSpeed(properties.up_speed_avg)} avg)`}
 						span={2}
 					/>
-					<InfoCell label="DL Limit" value={formatLimit(properties.dl_limit)} span={2} />
-					<InfoCell label="UP Limit" value={formatLimit(properties.up_limit)} span={2} />
+					<InfoCell
+						label="DL Limit"
+						value={formatLimit(properties.dl_limit)}
+						span={2}
+						onEdit={() => setLimits(initialLimits)}
+					/>
+					<InfoCell
+						label="UP Limit"
+						value={formatLimit(properties.up_limit)}
+						span={2}
+						onEdit={() => setLimits(initialLimits)}
+					/>
 					<InfoCell label="Ratio" value={ratio} span={3} />
 					<InfoCell
 						label="Reannounce"
@@ -246,6 +278,44 @@ function GeneralTab({ hash, category, tags }: { hash: string; category: string; 
 						span={3}
 					/>
 				</div>
+				{limits && (
+					<div className="mt-1.5 rounded border p-2 space-y-2 max-w-sm" style={cellBase}>
+						<div className="text-[9px] uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+							Speed Limits
+						</div>
+						<SpeedLimitFields
+							value={limits}
+							onChange={setLimits}
+							onSubmit={handleLimitsSave}
+							onCancel={() => setLimits(null)}
+							inputClassName="w-full px-3 py-2 rounded border text-xs"
+							inputStyle={{
+								backgroundColor: 'var(--bg-secondary)',
+								borderColor: 'var(--border)',
+								color: 'var(--text-primary)',
+							}}
+							labelClassName="text-[9px] uppercase tracking-widest"
+							autoFocus
+						/>
+						<div className="flex gap-2">
+							<button
+								onClick={() => setLimits(null)}
+								className="px-2.5 py-1.5 rounded text-[10px] font-medium"
+								style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' }}
+							>
+								Cancel
+							</button>
+							<button
+								onClick={handleLimitsSave}
+								disabled={speedLimitsMutation.isPending}
+								className="px-2.5 py-1.5 rounded text-[10px] font-medium disabled:opacity-50"
+								style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-contrast)' }}
+							>
+								Save
+							</button>
+						</div>
+					</div>
+				)}
 			</fieldset>
 
 			<fieldset className="border rounded p-2" style={{ borderColor: 'var(--border)' }}>

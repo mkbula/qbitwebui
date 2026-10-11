@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as api from '../api/qbittorrent'
 import type { AddTorrentOptions, TorrentFilterOptions } from '../api/qbittorrent'
 import { useInstance } from './useInstance'
+import type { SpeedLimitChanges } from '../utils/speedLimits'
 
 export function useTorrents(options: TorrentFilterOptions = {}) {
 	const instance = useInstance()
@@ -144,6 +145,19 @@ export function useSetTorrentDownloadPath() {
 	return useMutation({
 		mutationFn: ({ hashes, downloadPath }: { hashes: string[]; downloadPath: string }) =>
 			api.setTorrentDownloadPath(instance.id, hashes, downloadPath),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['torrents', instance.id] })
+			queryClient.invalidateQueries({ queryKey: ['torrent-properties', instance.id] })
+		},
+	})
+}
+
+export function useSetTorrentSpeedLimits() {
+	const instance = useInstance()
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: ({ hashes, limits }: { hashes: string[]; limits: SpeedLimitChanges }) =>
+			api.setTorrentSpeedLimits(instance.id, hashes, limits),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['torrents', instance.id] })
 			queryClient.invalidateQueries({ queryKey: ['torrent-properties', instance.id] })

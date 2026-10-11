@@ -6,6 +6,8 @@ export type SortKey =
 	| 'uploaded'
 	| 'dlspeed'
 	| 'upspeed'
+	| 'dl_limit'
+	| 'up_limit'
 	| 'ratio'
 	| 'state'
 	| 'category'
@@ -35,6 +37,8 @@ export const COLUMNS: ColumnDef[] = [
 	{ id: 'uploaded', label: 'Up', sortKey: 'uploaded' },
 	{ id: 'dlspeed', label: 'DL Speed', sortKey: 'dlspeed' },
 	{ id: 'upspeed', label: 'UP Speed', sortKey: 'upspeed' },
+	{ id: 'dl_limit', label: 'DL Limit', sortKey: 'dl_limit' },
+	{ id: 'up_limit', label: 'UP Limit', sortKey: 'up_limit' },
 	{ id: 'ratio', label: 'Ratio', sortKey: 'ratio' },
 	{ id: 'seeding_time', label: 'Seed Time', sortKey: 'seeding_time' },
 	{ id: 'added_on', label: 'Added', sortKey: 'added_on' },

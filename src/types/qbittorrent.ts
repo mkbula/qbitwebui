@@ -28,6 +28,8 @@ export interface Torrent {
 	progress: number
 	dlspeed: number
 	upspeed: number
+	dl_limit: number
+	up_limit: number
 	priority: number
 	num_seeds: number
 	num_leechs: number
